@@ -11,7 +11,7 @@ public class CameraController : MonoBehaviour
         transform.LookAt(target);
     }
 
-    void Update()
+    void LateUpdate()
     {
         //set transform
         transform.position = target.position - transform.forward * distance;

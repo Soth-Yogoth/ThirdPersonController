@@ -2,88 +2,89 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    private Animator animator;
-    //private Rigidbody rb;
-    private CharacterController characterController;
-    private float gravity = -9.8f;
+    [SerializeField] private Transform mainCamera;
+    [SerializeField] private float jumpHeight;
 
-    [SerializeField] private Transform camera;
+    private Animator animator;
+    private CharacterController characterController;
+
+    private int speed = 5;
+    private float velocityY = -9.8f;
+    private float raycastRad = 0;
+    private bool isFalling = false;
+    private bool jumpStarted = false;
+    private bool attackStarted = false;
+    
+    
 
     void Start()
     {
         animator = GetComponent<Animator>();
-        //rb = GetComponent<Rigidbody>();
         characterController = GetComponent<CharacterController>();
+
+        raycastRad = characterController.radius;
     }
 
     void Update()
     {
-        RaycastHit hit;
-        bool touchGround = Physics.BoxCast(transform.position + Vector3.up, new Vector3(0.375f, 0.05f, 0.3f), Vector3.down, out hit, Quaternion.LookRotation(transform.forward), 1f);
+        AnimatorStateInfo stateInfo;
+        stateInfo = animator.GetCurrentAnimatorStateInfo(0);
 
-        animator.SetBool("OnGround", touchGround);
+        RaycastHit hit = new RaycastHit();
+        bool isGrounded = Physics.SphereCast(transform.TransformPoint(characterController.center), raycastRad, Vector3.down, out hit, 1.1f - raycastRad);
 
-        if (!touchGround)
-        {
-            animator.SetBool("LockAction", true);
+        if (isFalling || velocityY > 0) velocityY -= 9.8f * Time.deltaTime;
+        else velocityY = isGrounded ? -9.8f : 0f;
 
-            animator.ResetTrigger("Jump");
-            animator.ResetTrigger("Attack");
-        }
+        isFalling = !isGrounded && velocityY <= 0;
+        animator.SetBool("IsFalling", isFalling);
 
-        if (animator.GetBool("LockMovement"))
-        {
-            //rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
-            return;
-        }
+        jumpStarted = stateInfo.IsTag("VerticalMovement") || isFalling ? false : jumpStarted;
+        attackStarted = stateInfo.IsTag("Attack") || isFalling ? false : attackStarted;
+
+        //
+        if (stateInfo.IsTag("Attack") || attackStarted) return;
 
         //Movement
-        Vector3 viewDirection = new Vector3(camera.forward.x, 0, camera.forward.z).normalized;
+        float rightMovement = Input.GetAxis("Horizontal");
+        float forwardMovement = Input.GetAxis("Vertical");
 
-        float velocityX = Input.GetAxis("Horizontal");
-        float velocityZ = Input.GetAxis("Vertical");
+        bool isMoving = forwardMovement != 0 || rightMovement != 0;
+        animator.SetBool("IsMoving", isMoving);
 
         bool sprint = Input.GetKey(KeyCode.LeftShift);
-        
-        int speed = sprint ? 10 : 5;
         animator.SetBool("IsSprinting", sprint);
 
-        if (velocityX != 0 || velocityZ != 0)
+        if (isGrounded) speed = sprint ? 10 : 5;
+
+        Vector3 viewDirection = Vector3.ProjectOnPlane(mainCamera.forward, Vector3.up);
+        Vector3 movementDirection = (forwardMovement * viewDirection + rightMovement * mainCamera.right).normalized;
+
+        Vector3 movementVelocity = (movementDirection * speed + Vector3.up * velocityY) * Time.deltaTime;
+        characterController.Move(movementVelocity);
+
+        if (isMoving)
         {
-            animator.SetBool("IsMoving", true);
-
-            Vector3 movementDirection = (velocityZ * viewDirection + velocityX * camera.right).normalized;
-            Quaternion targetRotation = Quaternion.LookRotation(movementDirection);
-            transform.rotation = targetRotation;
-
-            if (hit.normal != Vector3.up) 
-            {
-                movementDirection = Vector3.ProjectOnPlane(movementDirection, hit.normal);
-            }
-
-            Vector3 movementVelocity = (movementDirection * speed + Vector3.up * gravity) * Time.deltaTime;
-            //rb.linearVelocity = new Vector3(movementVelocity.x, rb.linearVelocity.y, movementVelocity.z);
-            characterController.Move(movementVelocity);
-        }
-        else
-        {
-            animator.SetBool("IsMoving", false);
-            characterController.Move(Vector3.up * gravity * Time.deltaTime);
-            //rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
+            Quaternion characterRotation = Quaternion.LookRotation(movementDirection);
+            transform.rotation = characterRotation;
         }
 
-        if (animator.GetBool("LockAction")) return;
+        //
+        if (stateInfo.IsTag("VerticalMovement") || jumpStarted || !isGrounded) return;
 
         //Jump
         if (Input.GetKeyDown(KeyCode.Space))
         {
+            jumpStarted = true;
             animator.SetTrigger("Jump");
-            //characterController.Move(Vector3.up * 3);
+            velocityY = Mathf.Sqrt(jumpHeight * 2 * 9.8f);
+            return;
         }
 
         //Attack
         if (Input.GetMouseButtonDown(0))
         {
+            attackStarted = true;
             animator.SetTrigger("Attack");
         }
     }

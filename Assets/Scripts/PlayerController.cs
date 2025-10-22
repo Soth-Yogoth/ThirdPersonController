@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
@@ -8,14 +8,11 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     private CharacterController characterController;
 
-    private int speed = 5;
-    private float velocityY = -9.8f;
+    private int speed = 4;
+    private float fallVelocity = 0;
+    private float jumpVelocity = 0;
     private float raycastRad = 0;
-    private bool isFalling = false;
-    private bool jumpStarted = false;
-    private bool attackStarted = false;
-    
-    
+    private bool attack = false;
 
     void Start()
     {
@@ -33,58 +30,63 @@ public class PlayerController : MonoBehaviour
         RaycastHit hit = new RaycastHit();
         bool isGrounded = Physics.SphereCast(transform.TransformPoint(characterController.center), raycastRad, Vector3.down, out hit, 1.1f - raycastRad);
 
-        if (isFalling || velocityY > 0) velocityY -= 9.8f * Time.deltaTime;
-        else velocityY = isGrounded ? -9.8f : 0f;
+        if (isGrounded && (fallVelocity > 0f || Vector3.Angle(Vector3.up, hit.normal) > 45)) jumpVelocity = 0f;
 
-        isFalling = !isGrounded && velocityY <= 0;
-        animator.SetBool("IsFalling", isFalling);
+        fallVelocity += isGrounded ? -fallVelocity : 9.8f * Time.deltaTime;
 
-        jumpStarted = stateInfo.IsTag("VerticalMovement") || isFalling ? false : jumpStarted;
-        attackStarted = stateInfo.IsTag("Attack") || isFalling ? false : attackStarted;
+        animator.SetBool("IsFalling", fallVelocity > 0);
+        animator.SetBool("Jump", jumpVelocity > 0);
 
         //
-        if (stateInfo.IsTag("Attack") || attackStarted) return;
+        if (stateInfo.IsTag("AfterAttack") || fallVelocity > 0) attack = false;
+        if (attack && isGrounded) return;
 
         //Movement
-        float rightMovement = Input.GetAxis("Horizontal");
-        float forwardMovement = Input.GetAxis("Vertical");
+        Vector3 movementInput = Vector3.zero;
+        movementInput.x = Input.GetAxis("Horizontal");
+        movementInput.z = Input.GetAxis("Vertical");
 
-        bool isMoving = forwardMovement != 0 || rightMovement != 0;
+        bool isMoving = movementInput.magnitude != 0;
         animator.SetBool("IsMoving", isMoving);
 
         bool sprint = Input.GetKey(KeyCode.LeftShift);
         animator.SetBool("IsSprinting", sprint);
 
-        if (isGrounded) speed = sprint ? 10 : 5;
-
-        Vector3 viewDirection = Vector3.ProjectOnPlane(mainCamera.forward, Vector3.up);
-        Vector3 movementDirection = (forwardMovement * viewDirection + rightMovement * mainCamera.right).normalized;
-
-        Vector3 movementVelocity = (movementDirection * speed + Vector3.up * velocityY) * Time.deltaTime;
-        characterController.Move(movementVelocity);
+        Vector3 horizontalMovement = Vector3.zero;
 
         if (isMoving)
         {
+            if (isGrounded) speed = sprint ? 8 : 4;
+
+            Vector3 viewDirection = Vector3.ProjectOnPlane(mainCamera.forward, Vector3.up);
+            Vector3 movementDirection = (movementInput.z * viewDirection + movementInput.x * mainCamera.right).normalized;
+
             Quaternion characterRotation = Quaternion.LookRotation(movementDirection);
             transform.rotation = characterRotation;
+
+            horizontalMovement = movementDirection * speed * Time.deltaTime; 
         }
 
+        float verticalMovementVelocity = (!isGrounded || jumpVelocity > 0) ? (jumpVelocity - fallVelocity) : -9.8f;
+        Vector3 verticalMovement = verticalMovementVelocity * Vector3.up * Time.deltaTime;
+
+        characterController.Move(horizontalMovement + verticalMovement);
+
         //
-        if (stateInfo.IsTag("VerticalMovement") || jumpStarted || !isGrounded) return;
+        if (stateInfo.IsTag("VerticalMovement") || fallVelocity + jumpVelocity > 0) return;
 
         //Jump
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            jumpStarted = true;
             animator.SetTrigger("Jump");
-            velocityY = Mathf.Sqrt(jumpHeight * 2 * 9.8f);
+            jumpVelocity = Mathf.Sqrt(jumpHeight * 2 * 9.8f);
             return;
         }
 
         //Attack
         if (Input.GetMouseButtonDown(0))
         {
-            attackStarted = true;
+            attack = true;
             animator.SetTrigger("Attack");
         }
     }

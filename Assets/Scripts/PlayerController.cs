@@ -8,10 +8,12 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     private CharacterController characterController;
 
+    private Vector3 controllerCenter = Vector3.zero;
+    private float controllerRad = 0;
+
     private int speed = 4;
     private float fallVelocity = 0;
     private float jumpVelocity = 0;
-    private float raycastRad = 0;
     private bool attack = false;
 
     void Start()
@@ -19,7 +21,8 @@ public class PlayerController : MonoBehaviour
         animator = GetComponent<Animator>();
         characterController = GetComponent<CharacterController>();
 
-        raycastRad = characterController.radius;
+        controllerRad = characterController.radius;
+        controllerCenter = characterController.center;
     }
 
     void Update()
@@ -28,7 +31,7 @@ public class PlayerController : MonoBehaviour
         stateInfo = animator.GetCurrentAnimatorStateInfo(0);
 
         RaycastHit hit = new RaycastHit();
-        bool isGrounded = Physics.SphereCast(transform.TransformPoint(characterController.center), raycastRad, Vector3.down, out hit, 1.1f - raycastRad);
+        bool isGrounded = Physics.SphereCast(transform.TransformPoint(controllerCenter), controllerRad, Vector3.down, out hit, 1.1f - controllerRad);
 
         if (isGrounded && (fallVelocity > 0f || Vector3.Angle(Vector3.up, hit.normal) > 45)) jumpVelocity = 0f;
 
@@ -39,7 +42,7 @@ public class PlayerController : MonoBehaviour
 
         //
         if (stateInfo.IsTag("AfterAttack") || fallVelocity > 0) attack = false;
-        if (attack && isGrounded) return;
+        if (attack) return;
 
         //Movement
         Vector3 movementInput = Vector3.zero;

@@ -33,9 +33,13 @@ public class PlayerController : MonoBehaviour
         RaycastHit hit = new RaycastHit();
         bool isGrounded = Physics.SphereCast(transform.TransformPoint(controllerCenter), controllerRad, Vector3.down, out hit, 1.1f - controllerRad);
 
-        if (isGrounded && (fallVelocity > 0f || Vector3.Angle(Vector3.up, hit.normal) > 45)) jumpVelocity = 0f;
+        if (isGrounded)
+        {
+            Physics.Raycast(hit.point + 0.05f * Vector3.up, Vector3.down, out hit, 0.1f);
+            if (fallVelocity > jumpVelocity || Vector3.Angle(Vector3.up, hit.normal) > 45) jumpVelocity = 0f;
+        }
 
-        fallVelocity += isGrounded ? -fallVelocity : 9.8f * Time.deltaTime;
+        fallVelocity += isGrounded && jumpVelocity == 0 ? -fallVelocity : 9.8f * Time.deltaTime;
 
         animator.SetBool("IsFalling", fallVelocity > 0);
         animator.SetBool("Jump", jumpVelocity > 0);

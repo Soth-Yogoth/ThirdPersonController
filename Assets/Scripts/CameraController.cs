@@ -20,6 +20,7 @@ public class CameraController : MonoBehaviour
         if (Input.GetMouseButton(1))
         {
             Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
 
             float angleX = 2 * Input.GetAxis("Mouse X");
             float angleY = 2 * Input.GetAxis("Mouse Y");
@@ -34,7 +35,11 @@ public class CameraController : MonoBehaviour
 
             transform.LookAt(target);
         }
-        else Cursor.visible = true;
+        else
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+        }
 
         //zoom
         float zoom = 2 * Input.GetAxis("Mouse ScrollWheel");
